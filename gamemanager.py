@@ -1,16 +1,15 @@
-import sys
-from time import *
-
+from Tkinter import *
+from ui import MainFrame
+from threading import Thread, Event
 
 class GameManager(object):
 
-    highscore = 0
-    commands = ["start", "stop", "reset", "highscore", "help", "quit"]
-
-    def __init__(self, playername):
+    def __init__(self, playername="no-one"):
         # Reset the score and player name
-        self.highscore = 0
+        self.high_score = 0
         self.playername = playername
+        self.commands = ["start", "stop", "reset", "highscore", "help", "quit"]
+        self.gr = None
 
     def init_game(self):
         # Print the menu
@@ -30,19 +29,71 @@ class GameManager(object):
         print ">     highscore : displays player's high score"
         print ">     help : prints available commands"
         print ">     quit : quits the game"
-        print ""
+        print ">"
 
     def run_gamemanager(self):
-        while(True):
+        while True:
             command = raw_input("> ")
             if command in self.commands:
-                print "> ", command, " registered"
+                getattr(self, command)()
             else:
                 print "> Command does not exist. Type help to see all available commands!"
 
+    def start(self):
+        self.gr = GameRunner()
+        self.gr.start()
+
+    def stop(self):
+        # Destroy the window
+        self.gr.set_stop()
+
+    def reset(self, playername=None):
+        self.high_score = 0
+
+        if playername is not None:
+            self.playername = playername
+
+    def highscore(self):
+        print "> Player %s has a high score of %d" % (self.playername, self.high_score)
+
+    def help(self):
+        self.print_menu()
+
+    def quit(self):
+        if self.gr is not None:
+            self.gr.set_stop()
+        exit(0)
+
+
+class GameRunner(Thread):
+
+    def __init__(self):
+        super(GameRunner, self).__init__()
+        self._stop = Event()
+        self.root = None
+        self.frame = None
+
+    def run(self):
+        # Create new UI instance
+        self.root = Tk()
+        self.root.geometry("620x620+300+300")
+        self.frame = MainFrame(self.root)
+        self.root.mainloop()
+
+        while not self._stop.isSet():
+            self._stop.wait(1)
+
+        self.quit()
+
+    def set_stop(self):
+        self._stop.set()
+
+    def quit(self):
+        print "getting here"
+        self.root.destroy()
 
 def main():
-    gm = GameManager(sys.argv[1])
+    gm = GameManager()
     gm.init_game()
     gm.run_gamemanager()
 

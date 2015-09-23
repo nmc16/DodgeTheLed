@@ -2,6 +2,7 @@ from Tkinter import *
 from ui import MainFrame
 from threading import Thread, Event
 
+
 class GameManager(object):
 
     def __init__(self, playername="no-one"):

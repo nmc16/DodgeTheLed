@@ -1,11 +1,57 @@
 from Tkinter import *
 from ttk import *
+from socket import socket, AF_INET, SOCK_DGRAM
+from copy import copy
+from random import randint
 from time import sleep
 
+
+class _Getch:
+    """Gets a single character from standard input.  Does not echo to the
+screen."""
+    def __init__(self):
+        try:
+            self.impl = _GetchWindows()
+        except ImportError:
+            self.impl = _GetchUnix()
+
+    def __call__(self): return self.impl()
+
+
+class _GetchUnix:
+    def __init__(self):
+        import tty, sys
+
+    def __call__(self):
+        import sys, tty, termios
+        fd = sys.stdin.fileno()
+        old_settings = termios.tcgetattr(fd)
+        try:
+            tty.setraw(sys.stdin.fileno())
+            ch = sys.stdin.read(1)
+        finally:
+            termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
+        return ch
+
+
+class _GetchWindows:
+    def __init__(self):
+        import msvcrt
+
+    def __call__(self):
+        import msvcrt
+        return msvcrt.getch()
+
+
+getch = _Getch()
 
 class MainFrame(Frame):
 
     PLAYER_ROW = 4
+    UDP_PORT = 5005
+    UDP_IP = "10.0.0.10"
+    RPI_CONTROLLER_ADDR = "10.0.0.3"
+    BUFFER_SIZE = 1024
 
     def __init__(self, parent):
         Frame.__init__(self, parent)
@@ -23,6 +69,11 @@ class MainFrame(Frame):
 
         # Setup the leds in the grid layout
         self.led_rows = self.setup_leds()
+
+        #self.sock = socket(AF_INET, SOCK_DGRAM)
+        #self.sock.bind((self.UDP_IP, self.UDP_PORT))
+
+        self.rows_passed = 0
 
     def center(self):
         """
@@ -55,13 +106,11 @@ class MainFrame(Frame):
             for j in range(5):
                 if i == 4:
                     if j == 2:
-                        led = Text(self.parent, background="green", foreground="red", height="7", width="14",
-                                   state=DISABLED)
+                        led = Text(self.parent, background="green", height="7", width="14", state=DISABLED)
                     else:
-                        led = Text(self.parent, background="black", foreground="red", height="7", width="14",
-                                   state=DISABLED)
+                        led = Text(self.parent, background="black", height="7", width="14", state=DISABLED)
                 else:
-                    led = Text(self.parent, background="gray", foreground="red", height="7", width="14", state=DISABLED)
+                    led = Text(self.parent, background="gray", height="7", width="14", state=DISABLED)
                 led.place(x=x_pos, y=y_pos)
                 led_rows[i].append(led)
                 x_pos += 120
@@ -77,6 +126,14 @@ class MainFrame(Frame):
         size_y = int(self.parent.geometry().split('+')[0].split('x')[1])
         label.place(x=(size_x/2)-260, y=(size_y/2)-50)
 
+    def read_piface_input(self):
+        data, address = self.sock.recvfrom(self.BUFFER_SIZE)
+        print "received data ", data, " from add ", address
+        return data, address
+
+    def read_keyboard(self):
+        print getch.__call__()
+
     def update_player(self, x_shift):
         """
             Shifts the player left or right given the input from the piface as a -1 for left and 1 for right
@@ -87,11 +144,75 @@ class MainFrame(Frame):
         self.player_pos += x_shift
         p_row[self.player_pos].configure(background="green")
 
+    def create_led_row(self):
+        # No need to shift the rows down when the it is the first row in the game
+        if self.rows_passed != 0:
+            rows = copy(self.led_rows)
+
+            for i in range(0, 3):
+                self.shift_rows(rows[2 - i], self.led_rows[3 - i])
+
+            open_index = 0
+            for led in self.led_rows[0]:
+                if led.config()["background"][4] == "gray":
+                    open_index = self.led_rows[0].index(led)
+
+            if open_index == 4:
+                shift = randint(-1, 0)
+            elif open_index == 0:
+                shift = randint(0, 1)
+            else:
+                shift = randint(-1, 1)
+
+            open_index += shift
+
+            for led in self.led_rows[0]:
+                led.configure(background="red")
+
+            self.led_rows[0][open_index].configure(background="gray")
+
+        else:
+            indexes_to_change = []
+            while len(indexes_to_change) < 4:
+                indexes_to_change.append(randint(0, 4))
+
+                # Remove duplicates so all 4 indexes are unique
+                indexes_to_change = list(set(indexes_to_change))
+
+            # Reset all the LEDs in the first row to gray that are left over
+            # TODO find more efficient way other than just resetting all
+            for led in self.led_rows[0]:
+                led.configure(background="gray")
+
+            # Change new LEDs to RED
+            for i in indexes_to_change:
+                self.led_rows[0][i].configure(background="red")
+
+        self.rows_passed += 1
+
+    def shift_rows(self, row1, row2):
+        colours = []
+        for led in row1:
+            colours.append(led.config()["background"][4])
+
+        i = 0
+        for led in row2:
+            led.config(background=colours[i])
+            i += 1
+
+    def run_ui(self):
+        #data, address = self.read_piface_input()
+        #if address == self.RPI_CONTROLLER_ADDR:
+        self.create_led_row()
+        self.pack()
+        self.after(1000, self.run_ui)
+
 
 def main():
     root = Tk()
     root.geometry("620x620+300+300")
     app = MainFrame(root)
+    root.after(1000, app.run_ui)
     root.mainloop()
 
 if __name__ == "__main__":

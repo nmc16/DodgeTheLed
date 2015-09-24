@@ -79,12 +79,11 @@ class GameRunner(Thread):
         self.root = Tk()
         self.root.geometry("620x620+300+300")
         self.frame = MainFrame(self.root)
+        self.root.lift()
+        self.root.attributes("-topmost", True)
+        self.frame.center()
+        self.root.after(1000, self.frame.run_ui)
         self.root.mainloop()
-
-        while not self._stop.isSet():
-            self._stop.wait(1)
-
-        self.quit()
 
     def set_stop(self):
         self._stop.set()
@@ -92,6 +91,7 @@ class GameRunner(Thread):
     def quit(self):
         print "getting here"
         self.root.destroy()
+
 
 def main():
     gm = GameManager()

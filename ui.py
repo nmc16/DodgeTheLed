@@ -6,47 +6,10 @@ from random import randint
 from time import sleep
 
 
-class _Getch:
-    """Gets a single character from standard input.  Does not echo to the
-screen."""
-    def __init__(self):
-        try:
-            self.impl = _GetchWindows()
-        except ImportError:
-            self.impl = _GetchUnix()
-
-    def __call__(self): return self.impl()
-
-
-class _GetchUnix:
-    def __init__(self):
-        import tty, sys
-
-    def __call__(self):
-        import sys, tty, termios
-        fd = sys.stdin.fileno()
-        old_settings = termios.tcgetattr(fd)
-        try:
-            tty.setraw(sys.stdin.fileno())
-            ch = sys.stdin.read(1)
-        finally:
-            termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
-        return ch
-
-
-class _GetchWindows:
-    def __init__(self):
-        import msvcrt
-
-    def __call__(self):
-        import msvcrt
-        return msvcrt.getch()
-
-
-getch = _Getch()
-
 class MainFrame(Frame):
 
+    _flag = False
+    collision_row = []
     PLAYER_ROW = 4
     UDP_PORT = 5005
     UDP_IP = "10.0.0.10"
@@ -108,7 +71,7 @@ class MainFrame(Frame):
                     if j == 2:
                         led = Text(self.parent, background="green", height="7", width="14", state=DISABLED)
                     else:
-                        led = Text(self.parent, background="black", height="7", width="14", state=DISABLED)
+                        led = Text(self.parent, background="gray", height="7", width="14", state=DISABLED)
                 else:
                     led = Text(self.parent, background="gray", height="7", width="14", state=DISABLED)
                 led.place(x=x_pos, y=y_pos)
@@ -131,9 +94,6 @@ class MainFrame(Frame):
         print "received data ", data, " from add ", address
         return data, address
 
-    def read_keyboard(self):
-        print getch.__call__()
-
     def update_player(self, x_shift):
         """
             Shifts the player left or right given the input from the piface as a -1 for left and 1 for right
@@ -146,11 +106,13 @@ class MainFrame(Frame):
 
     def create_led_row(self):
         # No need to shift the rows down when the it is the first row in the game
+        self.collision_row = copy(self.led_rows[3])
+
         if self.rows_passed != 0:
             rows = copy(self.led_rows)
 
-            for i in range(0, 3):
-                self.shift_rows(rows[2 - i], self.led_rows[3 - i])
+            for i in range(0, 4):
+                self.shift_rows(rows[3 - i], self.led_rows[4 - i])
 
             open_index = 0
             for led in self.led_rows[0]:
@@ -164,16 +126,15 @@ class MainFrame(Frame):
             else:
                 shift = randint(-1, 1)
 
-            open_index += shift
-
             for led in self.led_rows[0]:
                 led.configure(background="red")
 
+            open_index += shift
             self.led_rows[0][open_index].configure(background="gray")
 
         else:
             indexes_to_change = []
-            while len(indexes_to_change) < 4:
+            while len(indexes_to_change) < randint(2, 4):
                 indexes_to_change.append(randint(0, 4))
 
                 # Remove duplicates so all 4 indexes are unique
@@ -189,6 +150,7 @@ class MainFrame(Frame):
                 self.led_rows[0][i].configure(background="red")
 
         self.rows_passed += 1
+        self.led_rows[self.PLAYER_ROW][self.player_pos].configure(background="green")
 
     def shift_rows(self, row1, row2):
         colours = []
@@ -200,13 +162,42 @@ class MainFrame(Frame):
             led.config(background=colours[i])
             i += 1
 
+    def detect_collision(self):
+        if not self.collision_row:
+            return
+
+        if self.collision_row[self.player_pos].config()["background"][4] == "red":
+            self._flag = True
+            self.display_game_over()
+
     def run_ui(self):
-        #data, address = self.read_piface_input()
-        #if address == self.RPI_CONTROLLER_ADDR:
+        """
+        data, address = self.read_piface_input()
+        if address == self.RPI_CONTROLLER_ADDR:
+            self.update_player(data)
+        """
+
+        self.detect_collision()
         self.create_led_row()
         self.pack()
-        self.after(1000, self.run_ui)
 
+        if not self._flag:
+            self.after(1000, self.run_ui)
+        else:
+            self.led_rows[self.PLAYER_ROW][self.player_pos].configure(background="black")
+
+    def run_countdown(self):
+        label = Label(self.parent, background="white", foreground="red", text="3", font="Times 60 bold")
+        size_x = int(self.parent.geometry().split('+')[0].split('x')[0])
+        size_y = int(self.parent.geometry().split('+')[0].split('x')[1])
+        label.place(x=(size_x/2), y=(size_y/2))
+
+        i = 3
+        while i > 1:
+            label.configure(text=i)
+            i -= 1
+            self.pack()
+        label.destroy()
 
 def main():
     root = Tk()

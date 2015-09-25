@@ -1,18 +1,18 @@
-import sys
-import pifacedigitalio as pfio
-from time import *
-from threading import * 
+from Tkinter import *
+from ui import MainFrame
+from threading import Thread
+
 
 class GameManager(object):
 
-    highscore = 0
-    commands = ["start", "stop", "reset", "highscore", "help", "quit"]
+    def __init__(self, playername="no-one"):
+	""" Constructor for GameManager() """
 
-    def __init__(self, playername):
         # Reset the score and player name
-        self.highscore = 0
+        self.high_score = 0
         self.playername = playername
-        self.pfd = pfio.PiFaceDigital()
+        self.commands = ["start", "stop", "reset", "highscore", "help", "quit"]
+        self.gr = None
 
     def init_game(self):
         # Print the menu
@@ -32,39 +32,70 @@ class GameManager(object):
         print ">     highscore : displays player's high score"
         print ">     help : prints available commands"
         print ">     quit : quits the game"
-        print ""
+        print ">"
 
     def run_gamemanager(self):
-        t1_stop = Event()
-        t1 = Thread(target=self.run_leds, args=(1, t1_stop))
-        while(True):
+        while True:
             command = raw_input("> ")
-            if command in self.commands:
-                if command == "start":
-                   t1_stop = Event()
-                   t1 = Thread(target=self.run_leds, args=(1, t1_stop))
-                   t1.start()
-                if command == "stop":
-                    t1_stop.set()
+	    command = command.split(" ")
+            if command[0] in self.commands:
+		if command[0] == "reset" and len(command) > 1:
+		    getattr(self, command[0])(command[1])
+		else:
+                    getattr(self, command[0])()
             else:
                 print "> Command does not exist. Type help to see all available commands!"
-    
-    def run_leds(self, arg1, stop_event):
-        i = 0  
-        while(not stop_event.is_set()):
-            sleep(1)
-            self.pfd.leds[i].turn_on()
-            if i > 0:
-                self.pfd.leds[i-1].turn_off()
-            else:
-                self.pfd.leds[7].turn_off()
-            if i < 7:
-                i = i + 1
-            else:
-                i = 0 
+
+    def start(self):
+        self.gr = GameRunner()
+        self.gr.start()
+
+    def stop(self):
+        # Destroy the window
+        self.gr.set_stop()
+        self.gr = None
+
+    def reset(self, playername=None):
+        self.high_score = 0
+
+        if playername is not None:
+            self.playername = playername
+
+    def highscore(self):
+        print "> Player %s has a high score of %d" % (self.playername, self.high_score)
+
+    def help(self):
+        self.print_menu()
+
+    def quit(self):
+        if self.gr is not None:
+            self.gr.set_stop()
+        exit(0)
+
+
+class GameRunner(Thread):
+
+    def __init__(self):
+        super(GameRunner, self).__init__()
+        self.root = None
+        self.frame = None
+
+    def run(self):
+        # Create new UI instance
+        self.root = Tk()
+        self.root.geometry("620x620+300+300")
+        self.frame = MainFrame(self.root)
+        self.root.lift()
+        self.root.attributes("-topmost", True)
+        self.frame.center()
+        self.root.after(1000, self.frame.run_ui)
+        self.root.mainloop()
+
+    def set_stop(self):
+        self.frame.stop_ui()
 
 def main():
-    gm = GameManager(sys.argv[1])
+    gm = GameManager()
     gm.init_game()
     gm.run_gamemanager()
 

@@ -1,6 +1,6 @@
 from Tkinter import *
 from ui import MainFrame
-from threading import Thread, Event
+from threading import Thread
 
 
 class GameManager(object):
@@ -47,6 +47,7 @@ class GameManager(object):
     def stop(self):
         # Destroy the window
         self.gr.set_stop()
+        self.gr = None
 
     def reset(self, playername=None):
         self.high_score = 0
@@ -70,7 +71,6 @@ class GameRunner(Thread):
 
     def __init__(self):
         super(GameRunner, self).__init__()
-        self._stop = Event()
         self.root = None
         self.frame = None
 
@@ -86,11 +86,7 @@ class GameRunner(Thread):
         self.root.mainloop()
 
     def set_stop(self):
-        self._stop.set()
-
-    def quit(self):
-        print "getting here"
-        self.root.destroy()
+        self.frame.stop_ui()
 
 
 def main():

@@ -3,12 +3,13 @@ from ttk import *
 from socket import socket, AF_INET, SOCK_DGRAM
 from copy import copy
 from random import randint
-from time import sleep
+from threading import Event
 
 
 class MainFrame(Frame):
 
     _flag = False
+    _stop_event = Event()
     collision_row = []
     PLAYER_ROW = 4
     UDP_PORT = 5005
@@ -22,7 +23,8 @@ class MainFrame(Frame):
         self.parent = parent
 
         self.player_pos = 2
-        self.parent.title("Simple")
+        self.parent.title("Dodge The LED!")
+        self.parent.iconbitmap('doge_icon.ico')
         self.style = Style()
         self.style.theme_use("default")
         self.pack()
@@ -33,10 +35,17 @@ class MainFrame(Frame):
         # Setup the leds in the grid layout
         self.led_rows = self.setup_leds()
 
-        #self.sock = socket(AF_INET, SOCK_DGRAM)
+        self.sock = socket(AF_INET, SOCK_DGRAM)
         #self.sock.bind((self.UDP_IP, self.UDP_PORT))
 
         self.rows_passed = 0
+
+        self.remaining = 3
+        self.countdown = Label(self.parent, background="black", foreground="green", text="3", font="Times 60 bold",
+                               width=5, anchor=CENTER)
+        self.size_x = int(self.parent.geometry().split('+')[0].split('x')[0])
+        self.size_y = int(self.parent.geometry().split('+')[0].split('x')[1])
+        self.countdown.place(x=(self.size_x/2) - 100, y=(self.size_y/2) - 100)
 
     def center(self):
         """
@@ -84,7 +93,7 @@ class MainFrame(Frame):
         return led_rows
 
     def display_game_over(self):
-        label = Label(self.parent, background="white", foreground="red", text="GAME OVER!", font="Times 60 bold")
+        label = Label(self.parent, background="black", foreground="red", text="GAME OVER!", font="Times 60 bold")
         size_x = int(self.parent.geometry().split('+')[0].split('x')[0])
         size_y = int(self.parent.geometry().split('+')[0].split('x')[1])
         label.place(x=(size_x/2)-260, y=(size_y/2)-50)
@@ -170,34 +179,47 @@ class MainFrame(Frame):
             self._flag = True
             self.display_game_over()
 
+    def run_countdown(self):
+        self.remaining -= 1
+
+        if self.remaining == -1:
+            self.countdown.destroy()
+        elif self.remaining == 0:
+            self.countdown.configure(text="GO!")
+        else:
+            self.countdown.configure(text=self.remaining)
+
+        self.pack_propagate()
+
     def run_ui(self):
         """
         data, address = self.read_piface_input()
         if address == self.RPI_CONTROLLER_ADDR:
             self.update_player(data)
         """
+        if self.remaining > -1:
+            self.run_countdown()
+        else:
+            if not self._flag:
+                self.detect_collision()
+                self.create_led_row()
+                self.pack()
 
-        self.detect_collision()
-        self.create_led_row()
-        self.pack()
+        if self._stop_event.isSet():
+            self.parent.destroy()
 
         if not self._flag:
-            self.after(1000, self.run_ui)
+            cooldown = int((-3 * self.rows_passed) + 1000)
+            if cooldown < 100:
+                self.after(10, self.run_ui)
+            else:
+                self.after(cooldown, self.run_ui)
         else:
             self.led_rows[self.PLAYER_ROW][self.player_pos].configure(background="black")
+            self.after(1000, self.run_ui)
 
-    def run_countdown(self):
-        label = Label(self.parent, background="white", foreground="red", text="3", font="Times 60 bold")
-        size_x = int(self.parent.geometry().split('+')[0].split('x')[0])
-        size_y = int(self.parent.geometry().split('+')[0].split('x')[1])
-        label.place(x=(size_x/2), y=(size_y/2))
-
-        i = 3
-        while i > 1:
-            label.configure(text=i)
-            i -= 1
-            self.pack()
-        label.destroy()
+    def stop_ui(self):
+        self._stop_event.set()
 
 def main():
     root = Tk()

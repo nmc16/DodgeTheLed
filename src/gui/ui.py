@@ -21,7 +21,8 @@ class MainFrame(Frame):
     PLAYER_ROW = 4
     UDP_PORT = 5005
     UDP_IP = "10.0.0.10"
-    RPI_CONTROLLER_ADDR = "10.0.0.3"
+    RPI_COUNTER_ADDR = "10.0.0.3"
+    RPI_CONTROLLER_ADDR = "10.0.0.5"
     BUFFER_SIZE = 1024
 
     def __init__(self, parent):
@@ -66,6 +67,9 @@ class MainFrame(Frame):
 
         # Make socket non-blocking
         fcntl.fcntl(self.sock, fcntl.F_SETFL, os.O_NONBLOCK)
+
+        # Create the UDP socket to send messages
+        self.sock_outbound = socket(AF_INET, SOCK_DGRAM)
 
         # Reset program counters
         self.rows_passed = 0
@@ -141,6 +145,7 @@ class MainFrame(Frame):
         size_x = int(self.parent.geometry().split('+')[0].split('x')[0])
         size_y = int(self.parent.geometry().split('+')[0].split('x')[1])
         label.place(x=(size_x/2)-260, y=(size_y/2)-50)
+        self.sock_outbound.sendto("stop", (self.RPI_COUNTER_ADDR, self.UDP_PORT))
 
     def read_piface_input(self):
         """
@@ -184,6 +189,9 @@ class MainFrame(Frame):
         p_row = self.led_rows[self.PLAYER_ROW]
         p_row[self.player_pos].configure(background="gray")
         self.player_pos += x_shift
+        if p_row[self.player_pos].config("background")[4] == "red":
+            self._flag = True
+            self.display_game_over()
         p_row[self.player_pos].configure(background="green")
 
     def create_led_row(self):
@@ -330,7 +338,7 @@ class MainFrame(Frame):
                 self.update_player(data)
 
             # Add to the even queue again
-            self.after(10, self.run_controller)
+            self.after(100, self.run_controller)
 
     def run_ui(self):
         """
@@ -359,7 +367,7 @@ class MainFrame(Frame):
 
         if not self._flag:
             # Add itself back to the event queue after calculating the cool down
-            cooldown = int((-4 * self.rows_passed) + 1000)
+            cooldown = int((-7 * self.rows_passed) + 1000)
             if cooldown < 75:
                 self.after(75, self.run_ui)
             else:

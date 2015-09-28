@@ -1,7 +1,7 @@
 from Tkinter import *
-from src.gui.ui import MainFrame
 from socket import socket, AF_INET, SOCK_DGRAM, error
 import logging
+from src.gui.ui import MainFrame
 
 
 class GameManager(object):
@@ -90,10 +90,10 @@ class GameManager(object):
            Starts the game from the game runner and after it has finished updates the player's
            high score from the LCD controller.
         """
-
-        self.gr = GameRunner()
+        if self.gr is None:
+           self.gr = GameRunner()
         self.gr.run()
-        self.player.update_high_score(self.gr.high_score)
+        self.player.update_high_score(int(self.gr.high_score))
 
     def reset(self):
         """ Resets the player's high score to 0. """
@@ -140,7 +140,7 @@ class GameRunner(object):
        survived.
     """
 
-    _RPI_COUNTER_ADDR = "10.0.0.7"
+    _RPI_COUNTER_ADDR = "10.0.0.3"
     _RPI_COUNTER_PORT = 5005
     _UDP_PORT = 5004
     _UDP_IP = "10.0.0.10"
@@ -194,13 +194,12 @@ class GameRunner(object):
            :return: Data sent back from LCD controller
         """
 
-        self.sock_outbound.sendto("stop", (self._RPI_COUNTER_ADDR, self._RPI_COUNTER_PORT))
-
         data = ""
         address = ""
 
         # Read data from socket buffer
         try:
+            self.sock_inbound.settimeout(5000)
             data, address = self.sock_inbound.recvfrom(self._BUFFER_SIZE)
         except error, e:
             self.logger.error("Error occurred reading data from lcd controller: %s", e)

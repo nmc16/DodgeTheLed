@@ -1,6 +1,7 @@
 from Tkinter import *
 from socket import socket, AF_INET, SOCK_DGRAM, error
 import logging
+import os
 from src.gui.ui import MainFrame
 
 
@@ -15,6 +16,10 @@ class GameManager(object):
     def __init__(self, playername="no-one"):
         """ Constructor for GameManager() """
 
+        # Check if the logging directory exists and create it otherwise
+        if not os.path.exists('../logs/'):
+            os.makedirs('../logs/')
+
         # Setup logger
         self.logger = logging.getLogger('game')
         fh = logging.FileHandler('../logs/game.log')
@@ -26,6 +31,7 @@ class GameManager(object):
         # Reset the score and player name
         self.high_scores = {}
         self.player = HighScore(playername)
+        self.high_scores[playername] = self.player
         self.commands = ["start", "reset", "change_user", "highscore", "help", "quit"]
         self.gr = None
 
@@ -233,7 +239,10 @@ class HighScore(object):
 
 
 def main():
-    gm = GameManager()
+    if len(sys.argv) > 1:
+        gm = GameManager(sys.argv[1])
+    else:
+        gm = GameManager()
     gm.init_game()
     gm.run_gamemanager()
 

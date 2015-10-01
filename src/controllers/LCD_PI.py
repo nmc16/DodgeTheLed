@@ -103,10 +103,25 @@ class LcdPi(object):
         GPIO.output(self.LCD_E, False)
         time.sleep(self.E_DELAY)
 
-    def lcd_string(self, message, line):
-        """ Send string to display """
+    def lcd_string(self, message, line, style):
+        """ 
+           Send string to display on LCD
+     
+           :param message Message to print on the LCD
+           :param line Line on the LCD to print on
+           :param style Text justification: 1 = left justified
+                                            2 = centered
+                                            3 = right justified
+        """
 
-        message = message.ljust(self.LCD_WIDTH, " ")
+        if style == 1:
+            message = message.ljust(self.LCD_WIDTH, " ")
+        if style == 2:
+            message = message.center(self.LCD_WIDTH, " ")
+        if style == 3:
+            message = message.rjust(self.LCD_WIDTH, " ")
+        else:
+            message = message.ljust(self.LCD_WIDTH, " ")
 
         self.lcd_byte(line, self.LCD_CMD)
 
@@ -148,8 +163,8 @@ class UdpAdd(LcdPi):
 
                 self.sock_out.sendto(score, (self.UDP_IP_OUT, self.UDP_PORT_OUT))
                 self.lcd_byte(0x01, self.LCD_CMD)
-                self.lcd_string("GAME OVER!", self.LCD_LINE_1)
-                self.lcd_string("Score is: " + score, self.LCD_LINE_2)
+                self.lcd_string("GAME OVER!", self.LCD_LINE_1, 2)
+                self.lcd_string("Score is: " + score, self.LCD_LINE_2, 2)
 
     def start_timer(self):
         time_r = 0
@@ -157,12 +172,12 @@ class UdpAdd(LcdPi):
         while self.TIMER_TRUE:
             time_r += 1
             time_out = str(time_r)
-            self.lcd_string(time_out, self.LCD_LINE_1)
+            self.lcd_string(time_out, self.LCD_LINE_1, 2)
 
             data = self.recv_from_sock()
             if data == 'stop':
                 self.TIMER_TRUE = False
-                time.sleep(1)
+            time.sleep(1)
         return time_r
 
     def recv_from_sock(self):
@@ -186,6 +201,6 @@ if __name__ == '__main__':
         pass
     finally:
         testing.lcd_byte(0x01, testing.LCD_CMD)
-        testing.lcd_string("Goodbye!", testing.LCD_LINE_1)
+        testing.lcd_string("Goodbye!", testing.LCD_LINE_1, 2)
         GPIO.cleanup()
 

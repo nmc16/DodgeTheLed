@@ -13,8 +13,10 @@ class GameManager(object):
        checking the high scores, and quitting the game.
     """
 
-    def __init__(self, playername="no-one"):
+    def __init__(self, playername="no-one", controller_addr="10.0.0.5"):
         """ Constructor for GameManager() """
+
+        self.controller = controller_addr
 
         # Check if the logging directory exists and create it otherwise
         if not os.path.exists('../logs/'):
@@ -97,7 +99,7 @@ class GameManager(object):
            high score from the LCD controller.
         """
         if self.gr is None:
-           self.gr = GameRunner()
+           self.gr = GameRunner(self.controller)
         self.gr.run()
         self.player.update_high_score(int(self.gr.high_score))
 
@@ -152,10 +154,11 @@ class GameRunner(object):
     _UDP_IP = "10.0.0.10"
     _BUFFER_SIZE = 512
 
-    def __init__(self):
+    def __init__(self, controller_addr="10.0.0.5"):
         # Reset the high score
         self.high_score = 0
 
+        self.controller = controller_addr
         self.logger = logging.getLogger('game')
 
         # Create the UDP socket to send and receive messages
@@ -173,7 +176,7 @@ class GameRunner(object):
         # Create new UI instance
         root = Tk()
         root.geometry("620x620+300+300")
-        frame = MainFrame(root)
+        frame = MainFrame(root, self.controller)
 
         # Bring it to the front
         root.lift()
@@ -239,7 +242,9 @@ class HighScore(object):
 
 
 def main():
-    if len(sys.argv) > 1:
+    if len(sys.argv) > 2:
+        gm = GameManager(sys.argv[1], sys.argv[2])
+    elif len(sys.argv) > 1:
         gm = GameManager(sys.argv[1])
     else:
         gm = GameManager()

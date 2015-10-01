@@ -25,8 +25,11 @@ class MainFrame(Frame):
     RPI_CONTROLLER_ADDR = "10.0.0.5"
     BUFFER_SIZE = 1024
 
-    def __init__(self, parent):
+    def __init__(self, parent, controller_addr="10.0.0.5"):
         Frame.__init__(self, parent)
+
+        self.RPI_CONTROLLER_ADDR = controller_addr
+        print "> Connected to controller with address: ", controller_addr
 
         # Setup logger
         self.logger = logging.getLogger('MainFrame')
